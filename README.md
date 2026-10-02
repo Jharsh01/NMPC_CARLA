@@ -22,6 +22,7 @@ smallest gap each controller can handle.
 | `overtake_nmpc/sim/` | Closed-loop simulation (local and CARLA) |
 | `overtake_nmpc/scenarios/` | Benchmark scenario definitions and metrics |
 | `overtake_nmpc/safety/` | Safety mechanisms wrapping the controller |
+| `docs/scenarios.md` | Benchmark scenarios and how the pure-pursuit route is built |
 | `docs/safety/` | Functional-safety work products (ISO 26262 concepts) |
 | `tests/` | Tests |
 | `legacy/` | Original course NMPC formulations this project grew from |
