@@ -11,7 +11,9 @@ The same controllers also run on a multibody sedan from Project Chrono
 (Pacejka tires, suspension, left/right load transfer). There the pure-pursuit
 baseline completes the lap, but the NMPC does not yet: it passes three of the
 four overtaking cases and spins in the wet one and on the circuit (see
-[Project Chrono plant](#project-chrono-plant)). CARLA integration is not done.
+[Project Chrono plant](#project-chrono-plant)). CARLA integration is not done;
+the tools for it install with one script (see
+[CARLA and Bench2Drive on a cloud GPU](#carla-and-bench2drive-on-a-cloud-gpu)).
 
 ## Vehicle model
 
@@ -442,6 +444,7 @@ results/                  logs and videos (not in git)
 preflight.py              check to run before launching a simulation
 tests/                    tests (pytest, through the Python module); slow ones are marked `slow`
 run.sh                    setup, build, check and launch in one step
+cloud/                    setup of a GPU machine for CARLA and Bench2Drive, checks, route runner
 docs/                     vehicle parameter derivations and the CARLA readout
 ```
 
@@ -484,3 +487,62 @@ build/identify_chrono          # after building this project: writes parameters_
 
 If a ROS 2 environment is sourced in the shell, its pytest plugins break test
 collection; run `PYTHONPATH= pytest` instead.
+
+## CARLA and Bench2Drive on a cloud GPU
+
+`cloud/setup.sh` prepares a GPU machine for the next step: running these
+controllers in CARLA 0.9.15 and scoring them with
+[Bench2Drive](https://github.com/Thinklab-SJTU/Bench2Drive). The agent that
+connects the controllers to the benchmark is not written yet; the script
+installs what it will need and checks it.
+
+On a new instance (written for NVIDIA Brev in VM mode: Ubuntu, the NVIDIA
+driver, an ordinary user with sudo):
+
+```bash
+git clone https://github.com/Jharsh01/NMPC_CARLA.git
+cd NMPC_CARLA
+cloud/setup.sh            # everything below, then the checks; 16 GB of downloads
+cloud/check.sh --route    # one Bench2Drive route with its sample agent
+```
+
+A step that is already done is skipped, so the script can be run again after a
+failure or an interrupted download. `cloud/setup.sh --help` lists the options
+(`--no-maps`, `--no-carla`, `--no-system`, `--no-check`).
+
+| Installed | Where |
+| --- | --- |
+| Compiler, CMake, Eigen and the libraries CARLA's server loads | apt |
+| uv, which creates the Python environments | `~/.local/bin` |
+| This repository's environment (Python 3.12) and build | `.venv`, `build/` |
+| Python 3.8 with the CARLA client and Bench2Drive's packages, and the controllers built for it | `.venv-b2d`, `build-b2d/` |
+| CARLA 0.9.15 with its additional maps (Town06, 07, 11, 12, 13, 15) | `external/carla` |
+| Bench2Drive, release 0.0.4, at a fixed commit | `external/Bench2Drive` |
+
+The instance needs about 60 GB of free disk (an estimate; the two CARLA
+archives are 8.4 and 7.4 GB compressed). CARLA does not start as root.
+Bench2Drive is cloned from its own repository, not copied into this one; its
+licence is CC BY-NC-ND.
+
+To run routes (the evaluator starts and stops the CARLA server itself):
+
+```bash
+cloud/b2d.sh --routes 24906                       # one route, Bench2Drive's sample agent
+cloud/b2d.sh --routes 24906,25169 --agent FILE    # these routes with an agent of your own
+source cloud/env.sh                               # CARLA_ROOT, PYTHONPATH and the rest in this shell
+```
+
+Results go to `results/b2d/NAME/`: `results.json` holds a record per route.
+The sample agent only follows its lane, so on an overtaking route it is expected
+to stop behind the obstacle; the run shows that the chain works, not a pass.
+
+If the CARLA server does not start, `cloud/check.sh` prints the end of its log.
+On a cloud machine the usual cause is an NVIDIA driver installed without its
+graphics libraries, which Vulkan needs. `external/Bench2Drive/tools/clean_carla.sh`
+stops servers left over from a run that was interrupted.
+
+Tested so far: `cloud/setup.sh --no-carla` from a clean Ubuntu 22.04 container
+(GCC 11, CMake 3.22) through to its checks, and the download, unpack and rerun
+steps with small stand-in archives. Not tested: a Brev instance, the two CARLA
+downloads in full, and a start of the real CARLA server, so
+`cloud/check.sh --route` has not yet been run to the end.

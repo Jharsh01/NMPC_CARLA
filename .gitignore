@@ -14,6 +14,11 @@ build/
 *.so
 build_cmake.log
 
+# cloud set-up (cloud/setup.sh): CARLA and Bench2Drive, their Python 3.8 environment and build
+external/
+.venv-b2d/
+build-b2d/
+
 # simulation outputs
 results/
 *.mp4
