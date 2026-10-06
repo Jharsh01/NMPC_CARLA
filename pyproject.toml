@@ -13,13 +13,17 @@ dependencies = [
     "numpy>=1.26,<3",
     "scipy>=1.11,<2",
     "matplotlib>=3.8,<4",
+    "imageio-ffmpeg>=0.4",
+    "pybind11>=2.11",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
 
 [tool.setuptools.packages.find]
-include = ["overtake_nmpc*"]
+include = ["sim*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["slow: closed-loop runs that take more than a second; skipped by the quick check in preflight.py"]

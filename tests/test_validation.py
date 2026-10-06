@@ -1,20 +1,18 @@
 """Closed-form checks of the simulated vehicle against hand calculations."""
 
-from dataclasses import replace
+from overtake_core import replace
 
 import numpy as np
 import pytest
 
-from overtake_nmpc.model.bicycle import IDELTA, IR, IUX, IUY, IX, NX, dynamics, fx_limits
-from overtake_nmpc.model.params import VehicleParams
-from overtake_nmpc.sim.plant import Plant
+from overtake_core import BicyclePlant, dynamics, fx_limits, IDELTA, IR, IUX, IUY, IX, NX, VehicleParams
 
 NO_DRAG = replace(VehicleParams(), CdA=0.0, Crr=0.0)
 DT_CTRL = 0.01
 
 
 def ideal_plant(p):
-    return Plant(p, tau_steer=0.0, relaxation_length=0.0)
+    return BicyclePlant(p, tau_steer=0.0, relaxation_length=0.0)
 
 
 def hold_speed(x, v_ref, p, gain=2.0):
@@ -57,6 +55,7 @@ def test_steady_state_yaw_rate_matches_understeer_gradient(Ux):
     assert x[IR] == pytest.approx(expected, rel=0.01)
 
 
+@pytest.mark.slow
 def test_lateral_acceleration_saturates_at_mu_g():
     p = NO_DRAG
     Ux = 25.0
@@ -73,10 +72,11 @@ def test_lateral_acceleration_saturates_at_mu_g():
     assert 0.9 * p.mu * p.g <= max(ay) <= 1.001 * p.mu * p.g
 
 
+@pytest.mark.slow
 def test_lags_delay_response_but_keep_steady_state():
     p = NO_DRAG
     Ux, rate, t_ramp = 20.0, 0.1, 0.1
-    ideal, lagged = ideal_plant(p), Plant(p)
+    ideal, lagged = ideal_plant(p), BicyclePlant(p)
     early = {}
     for name, plant in (("ideal", ideal), ("lagged", lagged)):
         plant.reset(start_state(Ux))

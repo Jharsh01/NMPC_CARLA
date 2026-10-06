@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 
-from overtake_nmpc.scenarios.circuit import CORNERS, RADII, START, Circuit, TrafficCar
-from overtake_nmpc.scenarios.track import Track
+from overtake_core import Circuit, CORNERS, RADII, START, Track, TrafficCar
 
 
 @pytest.fixture(scope="module")

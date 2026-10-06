@@ -1,6 +1,6 @@
 # Vehicle parameters: CARLA Tesla Model 3
 
-The model's default parameters (`overtake_nmpc/model/params.py`) describe
+The model's default parameters (`parameters.json`, loaded by `parameters.cpp`) describe
 `vehicle.tesla.model3` in CARLA 0.9.15.
 
 **Sources**

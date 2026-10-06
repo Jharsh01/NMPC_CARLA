@@ -1,12 +1,7 @@
 import numpy as np
 import pytest
 
-from overtake_nmpc.controllers.nmpc_track import TrackNMPC
-from overtake_nmpc.model.bicycle import IUX
-from overtake_nmpc.model.params import VehicleParams
-from overtake_nmpc.scenarios.circuit import Circuit
-from overtake_nmpc.sim.lap import run_lap
-from overtake_nmpc.sim.plant import Plant
+from overtake_core import BicyclePlant, Circuit, IUX, run_lap, TrackNMPC, VehicleParams
 
 
 def test_ego_starts_on_the_right_lane_centre():
@@ -21,17 +16,18 @@ def test_plant_friction_follows_the_surface():
     p = VehicleParams()
     x0 = c.initial_state()
     x0[1] += 1.75 + 4.5  # centre of gravity on the left grass strip
-    log, r = run_lap(c, lambda t, x: np.zeros(2), Plant(p), x0=x0, t_max=0.5)
+    log, r = run_lap(c, lambda t, x: np.zeros(2), BicyclePlant(p), x0=x0, t_max=0.5)
     assert np.all(log.mu == c.mu_grass)
     assert r.time_on_grass == pytest.approx(0.5, abs=0.02)
     assert r.road_margin < 0.0
 
 
+@pytest.mark.slow
 def test_nmpc_brakes_for_the_tight_corners_and_passes_traffic():
     c = Circuit()
     p = VehicleParams()
     controller = TrackNMPC(c, p)
-    log, r = run_lap(c, controller, Plant(p), t_max=14.0)  # start line to the end of the tight corners
+    log, r = run_lap(c, controller, BicyclePlant(p), t_max=14.0)  # start line to the end of the tight corners
     assert controller.failures == 0
     assert not r.collided and not r.left_track
     assert r.time_on_grass == 0.0 and r.road_margin > 0.0
@@ -44,7 +40,7 @@ def test_nmpc_brakes_for_the_tight_corners_and_passes_traffic():
 
 
 def test_speed_profile_respects_grip_and_brakes():
-    from overtake_nmpc.controllers.speed_profile import grip_speed_profile
+    from overtake_core import grip_speed_profile
 
     c = Circuit()
     s, v = grip_speed_profile(c.track, (-1.75, 1.75), mu=0.9, v_max=c.v_max, grip_use=0.8, a_brake=4.0)
@@ -55,13 +51,14 @@ def test_speed_profile_respects_grip_and_brakes():
     assert accel.min() >= -4.0 - 1e-6 and accel.max() <= 3.0 + 1e-6
 
 
+@pytest.mark.slow
 def test_pure_pursuit_follows_its_profile_and_moves_over_for_traffic():
-    from overtake_nmpc.controllers.pure_pursuit_track import TrackPurePursuit
+    from overtake_core import TrackPurePursuit
 
     c = Circuit()
     p = VehicleParams()
     controller = TrackPurePursuit(c, p)
-    log, r = run_lap(c, controller, Plant(p), t_max=16.0)
+    log, r = run_lap(c, controller, BicyclePlant(p), t_max=16.0)
     assert not r.collided and not r.left_track and r.road_margin > 0.0
     v_ref = controller.speed_reference(log.s)[0]
     assert np.abs(log.x[200:, IUX] - v_ref[200:]).max() < 1.0  # after the first 2 s of speeding up

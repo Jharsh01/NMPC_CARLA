@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from overtake_nmpc.model.tire import F_MIN, fiala_lateral
+from overtake_core import F_MIN, fiala_lateral
 
 C_ALPHA = 160e3
 MU = 0.9

@@ -1,16 +1,20 @@
-from dataclasses import replace
-
 import matplotlib
 import numpy as np
 import pytest
 
-from overtake_nmpc.controllers.path import QUINTIC_PEAK, plan_overtake, quintic, quintic_inverse
-from overtake_nmpc.controllers.pure_pursuit import PurePursuit
-from overtake_nmpc.model.bicycle import IUX
-from overtake_nmpc.model.params import VehicleParams
-from overtake_nmpc.scenarios.overtake import SCENARIOS
-from overtake_nmpc.sim.closed_loop import run_overtake
-from overtake_nmpc.sim.plant import Plant
+from overtake_core import (
+    BicyclePlant,
+    IUX,
+    plan_overtake,
+    PurePursuit,
+    quintic,
+    quintic_inverse,
+    QUINTIC_PEAK,
+    replace,
+    run_overtake,
+    SCENARIOS,
+    VehicleParams,
+)
 
 
 def test_quintic_shape():
@@ -52,9 +56,10 @@ def test_late_wet_path_is_shortened_to_clear_and_flagged_infeasible():
 def run(name):
     sc = SCENARIOS[name]
     p = replace(VehicleParams(), mu=sc.mu)
-    return run_overtake(sc, PurePursuit(sc, p), Plant(p))
+    return run_overtake(sc, PurePursuit(sc, p), BicyclePlant(p))
 
 
+@pytest.mark.slow
 def test_pure_pursuit_passes_nominal():
     _, res = run("nominal")
     assert res.passed, res
@@ -65,14 +70,15 @@ def test_pure_pursuit_fails_late_wet():
     assert "clearance" in res.failures
 
 
-def test_animation_saves_a_gif(tmp_path):
+@pytest.mark.slow
+def test_animation_saves_a_video(tmp_path):
     matplotlib.use("Agg")
-    from overtake_nmpc.sim.animate import animate
+    from sim.scenarios.overtake.animate import animate
 
     sc = SCENARIOS["late_wet"]
     p = replace(VehicleParams(), mu=sc.mu)
     controller = PurePursuit(sc, p)
-    log, res = run_overtake(sc, controller, Plant(p))
-    out = tmp_path / "run.gif"
+    log, res = run_overtake(sc, controller, BicyclePlant(p))
+    out = tmp_path / "run.mp4"
     animate(sc, {"pure pursuit": (log, res)}, controller.path, speed=4.0, save=out)
     assert out.stat().st_size > 0

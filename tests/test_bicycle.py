@@ -1,26 +1,19 @@
-from dataclasses import replace
-
-import casadi as ca
 import numpy as np
 import pytest
 
-from overtake_nmpc.model.backend import CASADI
-from overtake_nmpc.model.bicycle import IUX, IX, NU, NX, axle_forces, dynamics, fx_limits
-from overtake_nmpc.model.params import VehicleParams
+from overtake_core import axle_forces, dynamics, dynamics_casadi, fx_limits, IUX, IX, NU, NX, replace, VehicleParams
 
 P = VehicleParams()
 
 
 def test_casadi_and_numpy_agree():
-    x, u = ca.MX.sym("x", NX), ca.MX.sym("u", NU)
-    f = ca.Function("f", [x, u], [dynamics(x, u, P, CASADI)])
     rng = np.random.default_rng(0)
     lo = np.array([-10, -10, -1, 5, -2, -0.5, -0.2, -0.6, -8000])
     hi = np.array([10, 10, 1, 35, 2, 0.5, 0.2, 0.6, 4000])
     for _ in range(50):
         s = rng.uniform(lo, hi)
         np.testing.assert_allclose(
-            f(s[:NX], s[NX:]).full().ravel(), dynamics(s[:NX], s[NX:], P), rtol=1e-9, atol=1e-9
+            dynamics_casadi(s[:NX], s[NX:], P), dynamics(s[:NX], s[NX:], P), rtol=1e-9, atol=1e-9
         )
 
 

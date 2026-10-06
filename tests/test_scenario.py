@@ -1,13 +1,21 @@
-from dataclasses import replace
-
 import numpy as np
 import pytest
 
-from overtake_nmpc.model.bicycle import IDELTA, IPSI, IUX, IUY, IX, IY, NX
-from overtake_nmpc.model.params import VehicleParams
-from overtake_nmpc.scenarios.overtake import SCENARIOS, OvertakeScenario
-from overtake_nmpc.sim.closed_loop import run_overtake
-from overtake_nmpc.sim.plant import Plant
+from overtake_core import (
+    BicyclePlant,
+    IDELTA,
+    IPSI,
+    IUX,
+    IUY,
+    IX,
+    IY,
+    NX,
+    OvertakeScenario,
+    replace,
+    run_overtake,
+    SCENARIOS,
+    VehicleParams,
+)
 
 SC = OvertakeScenario()
 DT = 0.01
@@ -123,6 +131,7 @@ def test_return_must_hold_for_settle_time():
     assert "completed" in SC.evaluate(t, x).failures
 
 
+@pytest.mark.slow
 def test_closed_loop_overtake_with_scripted_steering():
     # feedback steering lags its reference, so give it a generous gap
     sc = replace(SC, d_trig=60.0)
@@ -133,7 +142,7 @@ def test_closed_loop_overtake_with_scripted_steering():
         delta_des = 0.02 * (lane_offset(t, t_back=8.0) - x[IY]) - 0.5 * x[IPSI]
         return [(delta_des - x[IDELTA]) / 0.1, 2.0 * p.m * (sc.v0 - x[IUX])]
 
-    log, res = run_overtake(sc, controller, Plant(p))
+    log, res = run_overtake(sc, controller, BicyclePlant(p))
     assert res.passed, res
     assert log.t[-1] == pytest.approx(res.t_complete + sc.settle_time, abs=DT)
     assert len(log.t) == len(log.x) == len(log.u)
@@ -142,7 +151,7 @@ def test_closed_loop_overtake_with_scripted_steering():
 
 def test_closed_loop_stops_at_collision():
     p = replace(VehicleParams(), mu=SC.mu)
-    log, res = run_overtake(SC, lambda t, x: [0.0, 0.0], Plant(p))
+    log, res = run_overtake(SC, lambda t, x: [0.0, 0.0], BicyclePlant(p))
     assert "clearance" in res.failures
     assert log.t[-1] < SC.d_trig / (SC.v0 - SC.v_lead) + 1.0
 

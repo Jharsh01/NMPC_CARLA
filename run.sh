@@ -1,32 +1,48 @@
 #!/usr/bin/env bash
-# Start everything: set up the Python environment if needed, run the tests,
-# then run pure pursuit and the NMPC on the scenarios and animate them together.
+# Start everything: set up the Python environment and build the C++ code if
+# needed, check it, then run a scenario with pure pursuit and the NMPC and
+# animate them together.
 #
-#   ./run.sh                    all scenarios, one window after another
-#   ./run.sh late_wet           one scenario
-#   ./run.sh --save             all scenarios written to results/*.gif
-#   ./run.sh --skip-tests --speed 0.5 nominal
-#   ./run.sh --setup-only       only create/update the environment
+#   ./run.sh                       the lap of the circuit, in a window
+#   ./run.sh --plant chrono        the same on the Project Chrono sedan
+#   ./run.sh --save                the lap written to results/circuit.mp4
+#   ./run.sh --speed 3             faster playback
+#   ./run.sh overtake late_wet     an overtaking case (or: overtake all)
+#   ./run.sh track --animate       draw the circuit with its traffic
+#   ./run.sh --no-animate          results only
+#   ./run.sh --test                run every test first, not only the quick check
+#   ./run.sh --no-check            skip the check before the launch
+#   ./run.sh --setup-only          only create the environment and build
+#
+# Other options go to the simulation (build/simulate -h): --controller, --perfect,
+# --range, --noise, --ego-noise, --road-range, --seed, --params.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 # a sourced ROS 2 environment puts pytest plugins on PYTHONPATH that break collection
 unset PYTHONPATH
 
-scenario=all
-speed=1.0
-run_tests=1
-save=""
+check=quick
 setup_only=0
+animate=1
+scenario=circuit
+sim_args=()   # for build/simulate
+view_args=()  # for python -m sim.view
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --skip-tests) run_tests=0 ;;
-        --save) save=results ;;
-        --speed) speed="$2"; shift ;;
+        circuit|overtake|track) scenario="$1" ;;
+        --test) check=full ;;
+        --no-check) check=none ;;
         --setup-only) setup_only=1 ;;
-        -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-        -*) echo "unknown option: $1" >&2; exit 1 ;;
-        *) scenario="$1" ;;
+        --no-animate) animate=0 ;;
+        --animate) view_args+=("$1") ;;
+        --speed) view_args+=("$1" "$2"); shift ;;
+        --save)
+            view_args+=("$1")
+            if [[ $# -gt 1 && $2 != -* ]]; then view_args+=("$2"); shift; fi ;;
+        -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --*) sim_args+=("$1"); if [[ $# -gt 1 && $2 != -* ]]; then sim_args+=("$2"); shift; fi ;;
+        *) sim_args+=("$1"); view_args+=("$1") ;;  # an overtake case
     esac
     shift
 done
@@ -46,8 +62,8 @@ if [[ ! -x $PY ]]; then
     fi
 fi
 
-if ! $PY -c "import overtake_nmpc, casadi, matplotlib, pytest" 2>/dev/null; then
-    echo "== installing the package and dependencies"
+if ! $PY -c "import casadi, matplotlib, imageio_ffmpeg, pybind11, pytest" 2>/dev/null; then
+    echo "== installing the Python dependencies"
     if $PY -m pip --version >/dev/null 2>&1; then
         $PY -m pip install -e ".[dev]"
     else
@@ -55,18 +71,25 @@ if ! $PY -c "import overtake_nmpc, casadi, matplotlib, pytest" 2>/dev/null; then
     fi
 fi
 
+echo "== building"
+[[ -f build/Makefile ]] || cmake -S . -B build >/dev/null
+cmake --build build -j"$(nproc)" | grep -vE '^\[|Built target|Consolidate|Entering|Leaving' || true
+
 [[ $setup_only == 1 ]] && { echo "== environment ready"; exit 0; }
 
-if [[ $run_tests == 1 ]]; then
-    echo "== running tests"
-    $PY -m pytest -q
+case $check in
+    quick) echo "== checking before the launch"; $PY preflight.py ;;
+    full) echo "== running every test"; $PY preflight.py --full ;;
+esac
+
+if [[ $scenario != track ]]; then
+    echo "== simulating: $scenario ${sim_args[*]:-}"
+    build/simulate "$scenario" "${sim_args[@]}"
+    [[ $animate == 1 ]] || exit 0
 fi
 
-echo "== running scenario: $scenario"
-args=("$scenario" --speed "$speed")
-[[ -n $save ]] && args+=(--save "$save")
-if [[ -z $save && -z ${DISPLAY:-}${WAYLAND_DISPLAY:-} ]]; then
-    echo "no display found; writing GIFs to results/ instead"
-    args+=(--save results)
+if [[ -z ${DISPLAY:-}${WAYLAND_DISPLAY:-} && " ${view_args[*]:-} " != *" --save"* ]]; then
+    echo "no display found; writing a video to results/ instead"
+    view_args+=(--save)
 fi
-$PY scripts/watch_overtake.py "${args[@]}"
+$PY -m sim.view "$scenario" "${view_args[@]}"

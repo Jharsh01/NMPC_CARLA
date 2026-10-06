@@ -9,6 +9,11 @@ venv/
 .idea/
 .DS_Store
 
+# C++ build
+build/
+*.so
+build_cmake.log
+
 # simulation outputs
 results/
 *.mp4

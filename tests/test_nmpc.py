@@ -1,23 +1,27 @@
-from dataclasses import replace
-
 import matplotlib
 import numpy as np
 import pytest
 
-from overtake_nmpc.controllers.nmpc import NMPC
-from overtake_nmpc.controllers.pure_pursuit import PurePursuit
-from overtake_nmpc.model.bicycle import IRATE, IX, IY, NX
-from overtake_nmpc.model.params import VehicleParams
-from overtake_nmpc.scenarios.overtake import SCENARIOS
-from overtake_nmpc.sim.closed_loop import run_overtake
-from overtake_nmpc.sim.plant import Plant
+from overtake_core import (
+    BicyclePlant,
+    IRATE,
+    IX,
+    IY,
+    NMPC,
+    NX,
+    PurePursuit,
+    replace,
+    run_overtake,
+    SCENARIOS,
+    VehicleParams,
+)
 
 
 def run(name, cls=NMPC):
     sc = SCENARIOS[name]
     p = replace(VehicleParams(), mu=sc.mu)
     controller = cls(sc, p)
-    return controller, *run_overtake(sc, controller, Plant(p))
+    return controller, *run_overtake(sc, controller, BicyclePlant(p))
 
 
 def test_ellipse_contains_the_keep_out_rectangle():
@@ -43,15 +47,17 @@ def test_first_solve_plans_around_the_lead_car():
     assert np.all((dx[1:] / c.ell_a) ** 2 + (c.plan[1:, IY] / c.ell_b) ** 2 >= 1.0 - 1e-6)
 
 
+@pytest.mark.slow
 def test_nmpc_passes_nominal():
     c, _, res = run("nominal")
     assert res.passed, res
     assert c.failures == 0
 
 
+@pytest.mark.slow
 def test_nmpc_passes_late_wet_and_animates_next_to_pure_pursuit(tmp_path):
     matplotlib.use("Agg")
-    from overtake_nmpc.sim.animate import animate
+    from sim.scenarios.overtake.animate import animate
 
     sc = SCENARIOS["late_wet"]
     pp, pp_log, pp_res = run("late_wet", PurePursuit)
